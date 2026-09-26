@@ -1,45 +1,39 @@
-from flask import Flask, render_template_string, request, redirect
+from flask import Flask, request
+from bank import Bank
 
 app = Flask(__name__)
-balance = 1000
-
-HTML = """
-<h2 style="text-align:center; font-family:Tahoma">🏦 نظام وفاء المصرفي</h2>
-<div style="max-width:400px;margin:auto; font-family:Tahoma; background:#f9f9f9; padding:20px; border-radius:10px">
-<p><b>رصيدك الحالي: {{balance}} دينار</b></p>
-<form method="post">
-<input name="amount" type="number" placeholder="المبلغ" required style="width:100%;padding:8px"><br><br>
-<button name="action" value="deposit" style="width:48%;padding:10px;background:green;color:white">إيداع</button>
-<button name="action" value="withdraw" style="width:48%;padding:10px;background:red;color:white">سحب</button>
-</form>
-<p style="color:{{color}}">{{msg}}</p>
-</div>
-"""
+bank = Bank()
 
 @app.route("/", methods=["GET", "POST"])
 def home():
-    global balance
     msg = ""
-    color = "black"
     if request.method == "POST":
-        try:
-            amount = int(request.form["amount"])
-            action = request.form["action"]
-            if action == "deposit":
-                balance += amount
-                msg = f"تم إيداع {amount} بنجاح"
-                color = "green"
-            else:
-                if balance >= amount:
-                    balance -= amount
-                    msg = f"تم سحب {amount} بنجاح"
-                    color = "red"
-                else:
-                    msg = "رصيدك لا يكفي!"
-                    color = "red"
-        except:
-            msg = "اكتبي رقم صحيح"
-    return render_template_string(HTML, balance=balance, msg=msg, color=color)
+        acc_id = request.form.get("acc")
+        amount = float(request.form.get("amount") or 0)
+        typ = request.form.get("typ")
+        msg = bank.do_transaction(acc_id, amount, typ)
+    
+    html = ""
+    for id, a in bank.accounts.items():
+        color = "green" if a["status"] == "نشط" else "red"
+        html += f'<div style="border-right:6px solid {color};background:#fff;padding:12px;margin:10px;border-radius:10px;color:#000"><b>{a["name"]} #{id}</b><br>الحالة: {a["status"]} - الرصيد: {a["balance"]} د.ل</div>'
+
+    logs_html = "<br>".join(bank.logs[::-1]) if bank.logs else "لا يوجد تنبيهات ✅"
+
+    return f"""
+    <html dir="rtl"><body style="font-family:Arial;background:#f0f2f5;padding:20px">
+    <h1 style="text-align:center;color:#000">🏦 منظومة وفاء V4 - التجميد التلقائي</h1>
+    <form method="post" style="background:#fff;padding:15px;border-radius:12px;text-align:center">
+    <input name="acc" placeholder="رقم الحساب 101" style="padding:10px;width:25%">
+    <input name="amount" type="number" placeholder="المبلغ" style="padding:10px;width:25%">
+    <button name="typ" value="ايداع" style="padding:10px;background:green;color:#fff;border:none;border-radius:8px">ايداع</button>
+    <button name="typ" value="سحب" style="padding:10px;background:blue;color:#fff;border:none;border-radius:8px">سحب</button>
+    </form>
+    <h3 style="color:blue;text-align:center">{msg}</h3>
+    {html}
+    <div style="background:#fff;padding:15px;margin-top:20px;border-radius:10px;color:#000"><h3>سجل الأمان 🔒</h3>{logs_html}</div>
+    </body></html>
+    """
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=10000)
