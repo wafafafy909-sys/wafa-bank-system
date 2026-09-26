@@ -1,71 +1,44 @@
-# Wafa Bank System - منظومة مصرفية
-# Student: Wafa Talbi
+import json
+from datetime import datetime, date
 
-class BankAccount:
-    def __init__(self, account_number, name, balance=0):
-        self.account_number = account_number
-        self.name = name
-        self.balance = balance
+class Bank:
+    def __init__(self):
+        self.accounts = {
+            "101": {"name": "وفاء - رئيسي", "balance": 15000, "status": "نشط", "tx": []},
+            "102": {"name": "محمد احمد", "balance": 8000, "status": "نشط", "tx": []},
+            "103": {"name": "سارة علي", "balance": 1200, "status": "نشط", "tx": []}
+        }
+        self.logs = []
 
-    def deposit(self, amount):
-        self.balance += amount
-        print(f"تم ايداع {amount} - الرصيد الجديد: {self.balance}")
+    def check_auto_freeze(self, acc_id, amount, type_op):
+        acc = self.accounts[acc_id]
+        today = date.today().isoformat()
+        # تجميد لو سحب اكثر من 5000
+        if type_op == "سحب" and amount > 5000:
+            acc["status"] = "مجمد تلقائيا - سحب كبير"
+            self.logs.append(f"🚨 تجميد {acc_id} - سحب {amount} > 5000")
+            return True
+        # تجميد لو 3 سحوبات في نفس اليوم
+        today_ops = [t for t in acc["tx"] if t["date"].startswith(today) and t["type"] == "سحب"]
+        if type_op == "سحب" and len(today_ops) >= 2:
+            acc["status"] = "مجمد - نشاط مشبوه"
+            self.logs.append(f"🚨 تجميد {acc_id} - 3 سحوبات في نفس اليوم")
+            return True
+        return False
 
-    def withdraw(self, amount):
-        if amount <= self.balance:
-            self.balance -= amount
-            print(f"تم السحب {amount} - الرصيد الجديد: {self.balance}")
+    def do_transaction(self, acc_id, amount, type_op):
+        if acc_id not in self.accounts:
+            return "الحساب مش موجود"
+        acc = self.accounts[acc_id]
+        if acc["status"] != "نشط":
+            return f"الحساب مجمد: {acc['status']}"
+        if self.check_auto_freeze(acc_id, amount, type_op):
+            return "تم التجميد التلقائي!"
+        if type_op == "سحب":
+            if acc["balance"] < amount:
+                return "الرصيد لا يكفي"
+            acc["balance"] -= amount
         else:
-            print("رصيدك لا يكفي!")
-
-    def check_balance(self):
-        print(f"صاحب الحساب: {self.name} - الرصيد: {self.balance}")
-
-# قائمة الحسابات
-accounts = {}
-
-def create_account():
-    acc_num = input("ادخلي رقم الحساب: ")
-    name = input("ادخلي اسم العميل: ")
-    balance = float(input("ادخلي الرصيد الابتدائي: "))
-    accounts[acc_num] = BankAccount(acc_num, name, balance)
-    print("تم انشاء الحساب بنجاح!")
-
-def main():
-    while True:
-        print("\n--- Wafa Bank System ---")
-        print("1. انشاء حساب جديد")
-        print("2. ايداع")
-        print("3. سحب")
-        print("4. كشف رصيد")
-        print("5. خروج")
-        
-        choice = input("اختاري: ")
-        
-        if choice == "1":
-            create_account()
-        elif choice == "2":
-            acc_num = input("رقم الحساب: ")
-            amount = float(input("المبلغ: "))
-            if acc_num in accounts:
-                accounts[acc_num].deposit(amount)
-            else:
-                print("الحساب غير موجود")
-        elif choice == "3":
-            acc_num = input("رقم الحساب: ")
-            amount = float(input("المبلغ: "))
-            if acc_num in accounts:
-                accounts[acc_num].withdraw(amount)
-            else:
-                print("الحساب غير موجود")
-        elif choice == "4":
-            acc_num = input("رقم الحساب: ")
-            if acc_num in accounts:
-                accounts[acc_num].check_balance()
-            else:
-                print("الحساب غير موجود")
-        elif choice == "5":
-            print("شكرا لاستخدامك منظومة وفاء المصرفية")
-            break
-
-main()
+            acc["balance"] += amount
+        acc["tx"].append({"type": type_op, "amount": amount, "date": datetime.now().isoformat()})
+        return "تمت العملية بنجاح ✅"
